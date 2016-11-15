@@ -23,6 +23,15 @@ const (
     go-pkg-prefix: "test.com"
     go-ide-cmd: ""
 
+    build {
+        rules: [
+        ]
+        ignore-dirs: [
+            "bazel-.*",
+            "third-party.*",
+        ]
+    }
+
     vendor-dirs: [
         "third-party-go/vendor",
     ]
@@ -40,7 +49,8 @@ var (
 	debug = flag.Bool("debug", false, "Enable debug output.")
 	build = flag.Bool("build", false, "Build all packages.")
 
-	dirs gopathfs.Dirs
+	dirs    gopathfs.Dirs
+	version string
 )
 
 func init() {
@@ -75,6 +85,13 @@ Options:`)
 func main() {
 	flag.Usage = usage
 	flag.Parse()
+
+	for _, arg := range flag.Args() {
+		if strings.ToLower(arg) == "version" {
+			fmt.Println("Version:", version)
+			return
+		}
+	}
 
 	// The command has to be executed in a bazel workspace.
 	if _, err := os.Stat(filepath.Join(dirs.Workspace, "WORKSPACE")); err != nil {
@@ -225,7 +242,7 @@ outterLoop:
 	for _, proj := range projects {
 		cmd := fmt.Sprintf("go install %s/%s/...", cfg.GoPkgPrefix, proj)
 		fmt.Println(cmd)
-		runCommandSimpleEnv(cfg, cmd)
+		runCommand(cfg, cmd)
 	}
 }
 
@@ -257,15 +274,18 @@ func runBazelBuild(workspace, target string) {
 func runCommand(cfg *gopathfs.GobazelConf, command string) error {
 	parts := strings.Split(command, " ")
 	cmd := exec.Command(parts[0], parts[1:]...)
-	env := os.Environ()
-	env = append(env, fmt.Sprintf("GOPATH=%s", cfg.GoPath))
-	cmd.Env = env
+	cmd.Env = replaceGoPath(cfg)
 	return cmd.Run()
 }
 
-func runCommandSimpleEnv(cfg *gopathfs.GobazelConf, command string) error {
-	parts := strings.Split(command, " ")
-	cmd := exec.Command(parts[0], parts[1:]...)
-	cmd.Env = []string{fmt.Sprintf("GOPATH=%s", cfg.GoPath)}
-	return cmd.Run()
+func replaceGoPath(cfg *gopathfs.GobazelConf) []string {
+	environ := []string{}
+	env := os.Environ()
+	for _, e := range env {
+		if strings.HasPrefix(e, "GOPATH=") {
+			e = fmt.Sprintf("GOPATH=%s", cfg.GoPath)
+		}
+		environ = append(environ, e)
+	}
+	return environ
 }
