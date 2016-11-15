@@ -14,7 +14,7 @@ import (
 // Open overwrites the parent's Open method.
 func (gpf *GoPathFs) Open(name string, flags uint32, context *fuse.Context) (file nodefs.File, code fuse.Status) {
 	if gpf.debug {
-		fmt.Printf("Reqeusted to open file %s.\n", name)
+		fmt.Printf("\nReqeusted to open file %s.\n", name)
 	}
 
 	if strings.HasPrefix(name, gpf.cfg.GoPkgPrefix+"/") {
@@ -37,7 +37,7 @@ func (gpf *GoPathFs) Create(name string, flags uint32, mode uint32,
 	context *fuse.Context) (file nodefs.File, code fuse.Status) {
 
 	if gpf.debug {
-		fmt.Printf("Reqeusted to create file %s.\n", name)
+		fmt.Printf("\nReqeusted to create file %s.\n", name)
 	}
 
 	prefix := gpf.cfg.GoPkgPrefix + "/"
@@ -51,12 +51,21 @@ func (gpf *GoPathFs) Create(name string, flags uint32, mode uint32,
 // Unlink overwrites the parent's Unlink method.
 func (gpf *GoPathFs) Unlink(name string, context *fuse.Context) (code fuse.Status) {
 	if gpf.debug {
-		fmt.Printf("Reqeusted to unlink file %s.\n", name)
+		fmt.Printf("\nReqeusted to unlink file %s.\n", name)
 	}
 
 	prefix := gpf.cfg.GoPkgPrefix + "/"
 	if strings.HasPrefix(name, prefix) {
-		return gpf.unlinkFirstPartyChildFile(name[len(prefix):], context)
+		name = filepath.Join(gpf.dirs.Workspace, name[len(prefix):])
+		return gpf.unlinkUnderlyingFile(name, context)
+	}
+
+	// Vendor directories.
+	for _, vendor := range gpf.cfg.Vendors {
+		name = filepath.Join(gpf.dirs.Workspace, vendor, name)
+		if status := gpf.unlinkUnderlyingFile(name, context); status == fuse.OK {
+			return status
+		}
 	}
 
 	return fuse.ENOSYS
@@ -65,7 +74,7 @@ func (gpf *GoPathFs) Unlink(name string, context *fuse.Context) (code fuse.Statu
 // Rename overwrites the parent's Rename method.
 func (gpf *GoPathFs) Rename(oldName string, newName string, context *fuse.Context) (code fuse.Status) {
 	if gpf.debug {
-		fmt.Printf("Reqeusted to rename from %s to %s.\n", oldName, newName)
+		fmt.Printf("\nReqeusted to rename from %s to %s.\n", oldName, newName)
 	}
 
 	if strings.HasPrefix(oldName, "jingoal.com/") {
@@ -166,9 +175,7 @@ func (gpf *GoPathFs) createFirstPartyChildFile(name string, flags uint32, mode u
 	return nodefs.NewLoopbackFile(f), fuse.OK
 }
 
-func (gpf *GoPathFs) unlinkFirstPartyChildFile(name string, context *fuse.Context) (code fuse.Status) {
-	name = filepath.Join(gpf.dirs.Workspace, name)
-
+func (gpf *GoPathFs) unlinkUnderlyingFile(name string, context *fuse.Context) (code fuse.Status) {
 	if gpf.debug {
 		fmt.Printf("Actually unlinking file %s.\n", name)
 	}
