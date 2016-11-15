@@ -279,11 +279,11 @@ func runCommand(cfg *gopathfs.GobazelConf, command string) error {
 }
 
 func replaceGoPath(cfg *gopathfs.GobazelConf) []string {
-	environ := []string{}
+	environ := []string{fmt.Sprintf("GOPATH=%s", cfg.GoPath)}
 	env := os.Environ()
 	for _, e := range env {
 		if strings.HasPrefix(e, "GOPATH=") {
-			e = fmt.Sprintf("GOPATH=%s", cfg.GoPath)
+			continue
 		}
 		environ = append(environ, e)
 	}

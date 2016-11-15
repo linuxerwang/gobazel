@@ -148,7 +148,9 @@ func (gpf *GoPathFs) openUnderlyingFile(name string, flags uint32,
 		return nil, fuse.ENOENT
 	}
 
-	fmt.Printf("Succeeded to open file: %s.\n", name)
+	if gpf.debug {
+		fmt.Printf("Succeeded to open file: %s.\n", name)
+	}
 	return nodefs.NewLoopbackFile(f), fuse.OK
 }
 
