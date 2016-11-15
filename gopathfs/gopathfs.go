@@ -23,6 +23,7 @@ type Dirs struct {
 // GoPathFs implements a virtual tree for src folder of GOPATH.
 type GoPathFs struct {
 	pathfs.FileSystem
+	debug         bool
 	dirs          *Dirs
 	cfg           *GobazelConf
 	ignoreRegexes []*regexp.Regexp
@@ -101,7 +102,7 @@ func (gpf *GoPathFs) isVendorDir(dir string) bool {
 }
 
 // NewGoPathFs returns a new GoPathFs.
-func NewGoPathFs(cfg *GobazelConf, dirs *Dirs) *GoPathFs {
+func NewGoPathFs(debug bool, cfg *GobazelConf, dirs *Dirs) *GoPathFs {
 	ignoreRegexes := make([]*regexp.Regexp, len(cfg.Ignores))
 	for i, ign := range cfg.Ignores {
 		ignoreRegexes[i] = regexp.MustCompile(ign)
@@ -109,6 +110,7 @@ func NewGoPathFs(cfg *GobazelConf, dirs *Dirs) *GoPathFs {
 
 	return &GoPathFs{
 		FileSystem:    pathfs.NewDefaultFileSystem(),
+		debug:         debug,
 		dirs:          dirs,
 		cfg:           cfg,
 		ignoreRegexes: ignoreRegexes,

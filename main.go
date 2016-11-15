@@ -33,7 +33,11 @@ const (
 `
 )
 
-var dirs gopathfs.Dirs
+var (
+	debug = flag.Bool("debug", false, "Enable debug output.")
+
+	dirs gopathfs.Dirs
+)
 
 func init() {
 	dirs = gopathfs.Dirs{}
@@ -107,7 +111,7 @@ func main() {
 	os.Mkdir(dirs.SrcDir, 0755)
 
 	// Create a FUSE virtual file system on dirs.SrcDir.
-	nfs := pathfs.NewPathNodeFs(gopathfs.NewGoPathFs(cfg, &dirs), nil)
+	nfs := pathfs.NewPathNodeFs(gopathfs.NewGoPathFs(*debug, cfg, &dirs), nil)
 	server, _, err := nodefs.MountRoot(dirs.SrcDir, nfs.Root(), nil)
 	if err != nil {
 		fmt.Printf("Mount fail: %v\n", err)
