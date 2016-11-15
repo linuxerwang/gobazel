@@ -7,13 +7,20 @@ import (
 	"github.com/linuxerwang/confish"
 )
 
-// GobazelConf represents global config.
+// GobazelConf represents the bazel build config.
+type BuildConf struct {
+	Rules   []string `cfg-attr:"rules"`
+	Ignores []string `cfg-attr:"ignore-dirs"`
+}
+
+// GobazelConf represents the gobazel global config.
 type GobazelConf struct {
-	GoPath      string   `cfg-attr:"go-path"`
-	GoPkgPrefix string   `cfg-attr:"go-pkg-prefix"`
-	GoIdeCmd    string   `cfg-attr:"go-ide-cmd"`
-	Ignores     []string `cfg-attr:"ignore-dirs"`
-	Vendors     []string `cfg-attr:"vendor-dirs"`
+	GoPath      string     `cfg-attr:"go-path"`
+	GoPkgPrefix string     `cfg-attr:"go-pkg-prefix"`
+	GoIdeCmd    string     `cfg-attr:"go-ide-cmd"`
+	Ignores     []string   `cfg-attr:"ignore-dirs"`
+	Vendors     []string   `cfg-attr:"vendor-dirs"`
+	Build       *BuildConf `cfg-attr:"build"`
 }
 
 type confWrapper struct {

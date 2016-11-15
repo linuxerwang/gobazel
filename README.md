@@ -141,6 +141,30 @@ You can set up your favorite IDE, or specify empty.
 The last step, execute "gobazel" command again (in the bazel workspace),
 and you should see the IDE launched and everything worked.
 
+Flag --build enables gobazel to build all bazel targets which satisfy the
+given criteria. An example config looks as follows:
+
+```
+gobazel {
+    ...
+
+    build {
+        rules: [
+            "genproto_go",
+        ]
+        ignore-dirs: [
+            "bazel-.*",
+            "third-party.*",
+        ]
+    }
+
+    ...
+}
+
+```
+
+Flag --debug enables gobazel to print out verbose debug information.
+
 ## Caveates
 
 - It only works on Linux. It requires FUSE, fsnotify.
@@ -172,4 +196,4 @@ and you should see the IDE launched and everything worked.
 ## Acknowledgement
 
 - FUSE bindings for Go: https://github.com/hanwen/go-fuse
-- File system event notification: github.com/rjeczalik/notify
+- File system event notification: https://github.com/rjeczalik/notify

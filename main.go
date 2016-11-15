@@ -8,6 +8,8 @@ import (
 	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"regexp"
+	"strings"
 	"time"
 
 	"github.com/hanwen/go-fuse/fuse/nodefs"
@@ -31,10 +33,12 @@ const (
     ]
 }
 `
+	bzlQuery = "kind(%s, deps(%s/...))"
 )
 
 var (
 	debug = flag.Bool("debug", false, "Enable debug output.")
+	build = flag.Bool("build", false, "Build all packages.")
 
 	dirs gopathfs.Dirs
 )
@@ -134,19 +138,134 @@ func main() {
 		}
 	}()
 
-	// If a Go IDE is specified, start it with the proper GOPATH.
-	if cfg.GoIdeCmd != "" {
-		go func() {
-			time.Sleep(time.Second)
-			cmd := exec.Command(cfg.GoIdeCmd)
-			env := os.Environ()
-			env = append(env, fmt.Sprintf("GOPATH=%s", cfg.GoPath))
-			cmd.Env = env
-			if err := cmd.Run(); err != nil {
+	go func() {
+		time.Sleep(time.Second)
+
+		// If set to build all packages.
+		if *build {
+			fmt.Println("\nBuilding all package, it may take seconds to a few minutes, depending on how many pakcages you have ...")
+
+			if cfg.Build == nil {
+				fmt.Println("No build config found in .gobazelrc, ignored.")
+				return
+			}
+
+			// Best effort run, errors are ignored.
+			bazelBuild(cfg, &dirs)
+		}
+
+		// If a Go IDE is specified, start it with the proper GOPATH.
+		if cfg.GoIdeCmd != "" {
+			fmt.Println("\nStarting IDE ...")
+			if err := runCommand(cfg, cfg.GoIdeCmd); err != nil {
 				fmt.Println("Error to run IDE, ", err)
 			}
-		}()
-	}
+		}
+	}()
 
 	server.Serve()
+}
+
+func bazelBuild(cfg *gopathfs.GobazelConf, dirs *gopathfs.Dirs) {
+	ignoreRegexes := make([]*regexp.Regexp, len(cfg.Build.Ignores))
+	for i, ign := range cfg.Build.Ignores {
+		ignoreRegexes[i] = regexp.MustCompile(ign)
+	}
+
+	f, err := os.Open(dirs.Workspace)
+	if err != nil {
+		fmt.Println("Failed to read workspace,", err)
+		os.Exit(2)
+	}
+	defer f.Close()
+
+	fis, err := f.Readdir(-1)
+	if err != nil {
+		fmt.Println("Failed to read workspace,", err)
+		os.Exit(2)
+	}
+
+	targets := map[string]struct{}{}
+	projects := []string{}
+
+outterLoop:
+	for _, fi := range fis {
+		fmt.Printf("Folder %s ... ", fi.Name())
+		if !fi.IsDir() || strings.HasPrefix(fi.Name(), ".") {
+			fmt.Println("ignored.")
+			continue
+		}
+
+		for _, re := range ignoreRegexes {
+			if re.MatchString(fi.Name()) {
+				fmt.Println("ignored.")
+				continue outterLoop
+			}
+		}
+
+		projects = append(projects, fi.Name())
+
+		// Check if there are given bazel build targets in this directory.
+		cmd := [3]string{"bazel", "query", ""}
+		for _, rule := range cfg.Build.Rules {
+			cmd[2] = fmt.Sprintf(bzlQuery, rule, fi.Name())
+			runBazelQuery(dirs.Workspace, fi.Name(), cmd[:], targets)
+		}
+
+		fmt.Println("done.")
+	}
+
+	// Execute bazel build.
+	for target, _ := range targets {
+		fmt.Printf("Build bazel target %.s", target)
+		runBazelBuild(dirs.Workspace, target)
+	}
+
+	// First party projects.
+	for _, proj := range projects {
+		cmd := fmt.Sprintf("go install %s/%s/...", cfg.GoPkgPrefix, proj)
+		fmt.Println(cmd)
+		runCommandSimpleEnv(cfg, cmd)
+	}
+}
+
+func runBazelQuery(workspace, folder string, command []string, targets map[string]struct{}) {
+	cmd := exec.Command(command[0], command[1:]...)
+	cmd.Dir = workspace
+	out, err := cmd.Output()
+	if err != nil {
+		return
+	}
+
+	for _, line := range strings.Split(string(out), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		if strings.HasPrefix(line, "//"+folder+"/") {
+			targets[line] = struct{}{}
+		}
+	}
+}
+
+func runBazelBuild(workspace, target string) {
+	cmd := exec.Command("bazel", "build", target)
+	cmd.Dir = workspace
+	cmd.Run()
+}
+
+func runCommand(cfg *gopathfs.GobazelConf, command string) error {
+	parts := strings.Split(command, " ")
+	cmd := exec.Command(parts[0], parts[1:]...)
+	env := os.Environ()
+	env = append(env, fmt.Sprintf("GOPATH=%s", cfg.GoPath))
+	cmd.Env = env
+	return cmd.Run()
+}
+
+func runCommandSimpleEnv(cfg *gopathfs.GobazelConf, command string) error {
+	parts := strings.Split(command, " ")
+	cmd := exec.Command(parts[0], parts[1:]...)
+	cmd.Env = []string{fmt.Sprintf("GOPATH=%s", cfg.GoPath)}
+	return cmd.Run()
 }
