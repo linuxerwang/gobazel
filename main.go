@@ -223,9 +223,9 @@ outterLoop:
 		projects = append(projects, fi.Name())
 
 		// Check if there are given bazel build targets in this directory.
-		cmd := [3]string{"bazel", "query", ""}
+		cmd := [4]string{"bazel", "query", "--keep_going", ""}
 		for _, rule := range cfg.Build.Rules {
-			cmd[2] = fmt.Sprintf(bzlQuery, rule, fi.Name())
+			cmd[3] = fmt.Sprintf(bzlQuery, rule, fi.Name())
 			runBazelQuery(dirs.Workspace, fi.Name(), cmd[:], targets)
 		}
 
@@ -234,7 +234,7 @@ outterLoop:
 
 	// Execute bazel build.
 	for target, _ := range targets {
-		fmt.Printf("Build bazel target %.s", target)
+		fmt.Printf("Build bazel target %s.\n", target)
 		runBazelBuild(dirs.Workspace, target)
 	}
 
@@ -249,10 +249,7 @@ outterLoop:
 func runBazelQuery(workspace, folder string, command []string, targets map[string]struct{}) {
 	cmd := exec.Command(command[0], command[1:]...)
 	cmd.Dir = workspace
-	out, err := cmd.Output()
-	if err != nil {
-		return
-	}
+	out, _ := cmd.Output()
 
 	for _, line := range strings.Split(string(out), "\n") {
 		line = strings.TrimSpace(line)

@@ -132,7 +132,6 @@ func (gpf *GoPathFs) openUnderlyingFile(name string, flags uint32,
 
 	if _, err := os.Stat(name); err != nil {
 		if os.IsNotExist(err) {
-			fmt.Printf("File not found: %s.\n", name)
 			return nil, fuse.ENOENT
 		}
 	}
