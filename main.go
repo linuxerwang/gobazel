@@ -238,12 +238,31 @@ outterLoop:
 		runBazelBuild(dirs.Workspace, target)
 	}
 
-	// First party projects.
+	// Run go install for all first party projects.
 	for _, proj := range projects {
-		cmd := fmt.Sprintf("go install %s/%s/...", cfg.GoPkgPrefix, proj)
-		fmt.Println(cmd)
-		runCommand(cfg, cmd)
+		runGoInstall(cfg, dirs.Workspace, proj)
 	}
+}
+
+func runGoInstall(cfg *gopathfs.GobazelConf, workspace, proj string) {
+	filepath.Walk(filepath.Join(workspace, proj), func(path string, info os.FileInfo, err error) error {
+		if info.Name() == "BUILD" {
+			if dir, err := filepath.Rel(workspace, path); err == nil {
+				dir = filepath.Dir(dir)
+				for _, v := range cfg.Vendors {
+					if strings.HasPrefix(dir, v) {
+						// Ignore third party Go vendor directories.
+						return nil
+					}
+				}
+
+				cmd := fmt.Sprintf("go install %s/%s", cfg.GoPkgPrefix, dir)
+				fmt.Println(cmd)
+				runCommand(cfg, cmd)
+			}
+		}
+		return nil
+	})
 }
 
 func runBazelQuery(workspace, folder string, command []string, targets map[string]struct{}) {
