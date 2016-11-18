@@ -26,8 +26,7 @@ func (gpf *GoPathFs) OpenDir(name string, context *fuse.Context) ([]fuse.DirEntr
 	entries := []fuse.DirEntry{}
 	var status fuse.Status
 	for _, vendor := range gpf.cfg.Vendors {
-		entries = entries[:]
-		entries, status = gpf.openUnderlyingDir(filepath.Join(gpf.dirs.Workspace, vendor, name), entries)
+		entries, status = gpf.openVendorChildDir(vendor, name, entries)
 		if status == fuse.OK {
 			return entries, fuse.OK
 		}
@@ -114,6 +113,14 @@ func (gpf *GoPathFs) openFirstPartyChildDir(name string) ([]fuse.DirEntry, fuse.
 	entries, _ = gpf.openUnderlyingDir(filepath.Join(gpf.dirs.Workspace, name), entries)
 	// Also search in bazel-genfiles.
 	entries, _ = gpf.openUnderlyingDir(filepath.Join(gpf.dirs.Workspace, "bazel-genfiles", name), entries)
+
+	return entries, fuse.OK
+}
+
+func (gpf *GoPathFs) openVendorChildDir(vendor, name string, entries []fuse.DirEntry) ([]fuse.DirEntry, fuse.Status) {
+	entries, _ = gpf.openUnderlyingDir(filepath.Join(gpf.dirs.Workspace, vendor, name), entries)
+	// Also search in bazel-genfiles.
+	entries, _ = gpf.openUnderlyingDir(filepath.Join(gpf.dirs.Workspace, "bazel-genfiles", vendor, name), entries)
 
 	return entries, fuse.OK
 }

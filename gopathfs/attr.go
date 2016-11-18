@@ -31,8 +31,15 @@ func (gpf *GoPathFs) GetAttr(name string, context *fuse.Context) (*fuse.Attr, fu
 
 	// Search in vendor directories.
 	for _, v := range gpf.cfg.Vendors {
-		name = filepath.Join(gpf.dirs.Workspace, v, name)
-		attr, status := gpf.getRealDirAttr(name)
+		fname := filepath.Join(gpf.dirs.Workspace, v, name)
+		attr, status := gpf.getRealDirAttr(fname)
+		if status == fuse.OK {
+			return attr, fuse.OK
+		}
+
+		// Also search in bezel-genfiles.
+		fname = filepath.Join(gpf.dirs.Workspace, "bazel-genfiles", v, name)
+		attr, status = gpf.getRealDirAttr(fname)
 		if status == fuse.OK {
 			return attr, fuse.OK
 		}

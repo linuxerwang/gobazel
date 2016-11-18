@@ -23,7 +23,7 @@ func (gpf *GoPathFs) Open(name string, flags uint32, context *fuse.Context) (fil
 
 	// Search in vendor directories.
 	for _, vendor := range gpf.cfg.Vendors {
-		f, status := gpf.openUnderlyingFile(filepath.Join(gpf.dirs.Workspace, vendor, name), flags, context)
+		f, status := gpf.openVendorChildFile(vendor, name, flags, context)
 		if status == fuse.OK {
 			return f, status
 		}
@@ -121,6 +121,18 @@ func (gpf *GoPathFs) openFirstPartyChildFile(name string, flags uint32,
 
 	// Also search in bazel-genfiles.
 	return gpf.openUnderlyingFile(filepath.Join(gpf.dirs.Workspace, "bazel-genfiles", name), flags, context)
+}
+
+func (gpf *GoPathFs) openVendorChildFile(vendor, name string, flags uint32,
+	context *fuse.Context) (file nodefs.File, code fuse.Status) {
+
+	f, status := gpf.openUnderlyingFile(filepath.Join(gpf.dirs.Workspace, vendor, name), flags, context)
+	if status == fuse.OK {
+		return f, status
+	}
+
+	// Also search in bazel-genfiles.
+	return gpf.openUnderlyingFile(filepath.Join(gpf.dirs.Workspace, "bazel-genfiles", vendor, name), flags, context)
 }
 
 func (gpf *GoPathFs) openUnderlyingFile(name string, flags uint32,
