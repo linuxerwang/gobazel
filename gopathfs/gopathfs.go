@@ -8,6 +8,8 @@ import (
 
 	"github.com/hanwen/go-fuse/fuse"
 	"github.com/hanwen/go-fuse/fuse/pathfs"
+	"github.com/linuxerwang/gobazel/conf"
+	"github.com/linuxerwang/gobazel/exec"
 	"github.com/rjeczalik/notify"
 )
 
@@ -25,7 +27,7 @@ type GoPathFs struct {
 	pathfs.FileSystem
 	debug         bool
 	dirs          *Dirs
-	cfg           *GobazelConf
+	cfg           *conf.GobazelConf
 	ignoreRegexes []*regexp.Regexp
 	notifyCh      chan notify.EventInfo
 }
@@ -66,14 +68,29 @@ func (gpf *GoPathFs) notifyFileChange(nodeFs *pathfs.PathNodeFs, path string) {
 		return
 	}
 
+	go nodeFs.Notify(filepath.Join(gpf.cfg.GoPkgPrefix, path))
+
+	isVendor := false
 	for _, vendor := range gpf.cfg.Vendors {
 		if strings.HasPrefix(path, vendor+"/") {
+			isVendor = true
 			nodeFs.FileNotify(path[len(vendor+"/"):], 0, 0)
-			continue
+			break
 		}
 	}
 
-	nodeFs.Notify(filepath.Join(gpf.cfg.GoPkgPrefix, path))
+	// If it's a proto file, run bazel build.
+	if strings.HasSuffix(path, ".proto") {
+		bzlPkg := filepath.Dir(path) + ":*"
+		exec.RunBazelBuild(gpf.dirs.Workspace, bzlPkg)
+	}
+
+	// Run go install.
+	goPkg := filepath.Dir(path)
+	if !isVendor {
+		goPkg = filepath.Join(gpf.cfg.GoPkgPrefix, goPkg)
+	}
+	exec.RunGoInstall(gpf.cfg, goPkg)
 }
 
 func (gpf *GoPathFs) isIgnored(dir string) bool {
@@ -102,7 +119,7 @@ func (gpf *GoPathFs) isVendorDir(dir string) bool {
 }
 
 // NewGoPathFs returns a new GoPathFs.
-func NewGoPathFs(debug bool, cfg *GobazelConf, dirs *Dirs) *GoPathFs {
+func NewGoPathFs(debug bool, cfg *conf.GobazelConf, dirs *Dirs) *GoPathFs {
 	ignoreRegexes := make([]*regexp.Regexp, len(cfg.Ignores))
 	for i, ign := range cfg.Ignores {
 		ignoreRegexes[i] = regexp.MustCompile(ign)

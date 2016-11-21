@@ -1,4 +1,4 @@
-VERSION=0.1.4
+VERSION=0.1.5
 
 all:
 	@echo "make binary: build gobazel binary"

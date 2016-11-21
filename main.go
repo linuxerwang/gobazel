@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"os/exec"
 	"os/signal"
 	"path/filepath"
 	"regexp"
@@ -14,6 +13,8 @@ import (
 
 	"github.com/hanwen/go-fuse/fuse/nodefs"
 	"github.com/hanwen/go-fuse/fuse/pathfs"
+	"github.com/linuxerwang/gobazel/conf"
+	"github.com/linuxerwang/gobazel/exec"
 	"github.com/linuxerwang/gobazel/gopathfs"
 )
 
@@ -114,7 +115,7 @@ func main() {
 		}
 	}
 
-	cfg := gopathfs.LoadConfig(dirs.GobzlConf)
+	cfg := conf.LoadConfig(dirs.GobzlConf)
 	if cfg.GoPath == "" {
 		fmt.Println("Error, go-path has to be set in your .gobazelrc file.")
 		os.Exit(2)
@@ -174,7 +175,7 @@ func main() {
 		// If a Go IDE is specified, start it with the proper GOPATH.
 		if cfg.GoIdeCmd != "" {
 			fmt.Println("\nStarting IDE ...")
-			if err := runCommand(cfg, cfg.GoIdeCmd); err != nil {
+			if err := exec.RunCommand(cfg, cfg.GoIdeCmd); err != nil {
 				fmt.Println("Error to run IDE, ", err)
 			}
 		}
@@ -183,7 +184,7 @@ func main() {
 	server.Serve()
 }
 
-func bazelBuild(cfg *gopathfs.GobazelConf, dirs *gopathfs.Dirs) {
+func bazelBuild(cfg *conf.GobazelConf, dirs *gopathfs.Dirs) {
 	ignoreRegexes := make([]*regexp.Regexp, len(cfg.Build.Ignores))
 	for i, ign := range cfg.Build.Ignores {
 		ignoreRegexes[i] = regexp.MustCompile(ign)
@@ -226,7 +227,7 @@ outterLoop:
 		cmd := [4]string{"bazel", "query", "--keep_going", ""}
 		for _, rule := range cfg.Build.Rules {
 			cmd[3] = fmt.Sprintf(bzlQuery, rule, fi.Name())
-			runBazelQuery(dirs.Workspace, fi.Name(), cmd[:], targets)
+			exec.RunBazelQuery(dirs.Workspace, fi.Name(), cmd[:], targets)
 		}
 
 		fmt.Println("done.")
@@ -235,73 +236,11 @@ outterLoop:
 	// Execute bazel build.
 	for target, _ := range targets {
 		fmt.Printf("Build bazel target %s.\n", target)
-		runBazelBuild(dirs.Workspace, target)
+		exec.RunBazelBuild(dirs.Workspace, target)
 	}
 
 	// Run go install for all first party projects.
 	for _, proj := range projects {
-		runGoInstall(cfg, dirs.Workspace, proj)
+		exec.RunGoWalkInstall(cfg, dirs.Workspace, proj)
 	}
-}
-
-func runGoInstall(cfg *gopathfs.GobazelConf, workspace, proj string) {
-	filepath.Walk(filepath.Join(workspace, proj), func(path string, info os.FileInfo, err error) error {
-		if info.Name() == "BUILD" {
-			if dir, err := filepath.Rel(workspace, path); err == nil {
-				dir = filepath.Dir(dir)
-				for _, v := range cfg.Vendors {
-					if strings.HasPrefix(dir, v) {
-						// Ignore third party Go vendor directories.
-						return nil
-					}
-				}
-
-				cmd := fmt.Sprintf("go install %s/%s", cfg.GoPkgPrefix, dir)
-				fmt.Println(cmd)
-				runCommand(cfg, cmd)
-			}
-		}
-		return nil
-	})
-}
-
-func runBazelQuery(workspace, folder string, command []string, targets map[string]struct{}) {
-	cmd := exec.Command(command[0], command[1:]...)
-	cmd.Dir = workspace
-	out, _ := cmd.Output()
-
-	for _, line := range strings.Split(string(out), "\n") {
-		line = strings.TrimSpace(line)
-		if line == "" {
-			continue
-		}
-		if strings.HasPrefix(line, "//"+folder+"/") {
-			targets[line] = struct{}{}
-		}
-	}
-}
-
-func runBazelBuild(workspace, target string) {
-	cmd := exec.Command("bazel", "build", target)
-	cmd.Dir = workspace
-	cmd.Run()
-}
-
-func runCommand(cfg *gopathfs.GobazelConf, command string) error {
-	parts := strings.Split(command, " ")
-	cmd := exec.Command(parts[0], parts[1:]...)
-	cmd.Env = replaceGoPath(cfg)
-	return cmd.Run()
-}
-
-func replaceGoPath(cfg *gopathfs.GobazelConf) []string {
-	environ := []string{fmt.Sprintf("GOPATH=%s", cfg.GoPath)}
-	env := os.Environ()
-	for _, e := range env {
-		if strings.HasPrefix(e, "GOPATH=") {
-			continue
-		}
-		environ = append(environ, e)
-	}
-	return environ
 }

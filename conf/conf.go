@@ -1,4 +1,4 @@
-package gopathfs
+package conf
 
 import (
 	"fmt"
