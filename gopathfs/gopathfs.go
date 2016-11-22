@@ -68,6 +68,10 @@ func (gpf *GoPathFs) notifyFileChange(nodeFs *pathfs.PathNodeFs, path string) {
 		return
 	}
 
+	if strings.HasSuffix(path, "/.git") || strings.Contains(path, "/.git/") {
+		return
+	}
+
 	go nodeFs.Notify(filepath.Join(gpf.cfg.GoPkgPrefix, path))
 
 	isVendor := false
@@ -86,11 +90,13 @@ func (gpf *GoPathFs) notifyFileChange(nodeFs *pathfs.PathNodeFs, path string) {
 	}
 
 	// Run go install.
-	goPkg := filepath.Dir(path)
-	if !isVendor {
-		goPkg = filepath.Join(gpf.cfg.GoPkgPrefix, goPkg)
+	if strings.HasSuffix(path, ".proto") || strings.HasSuffix(path, ".go") {
+		goPkg := filepath.Dir(path)
+		if !isVendor {
+			goPkg = filepath.Join(gpf.cfg.GoPkgPrefix, goPkg)
+		}
+		exec.RunGoInstall(gpf.cfg, goPkg)
 	}
-	exec.RunGoInstall(gpf.cfg, goPkg)
 }
 
 func (gpf *GoPathFs) isIgnored(dir string) bool {

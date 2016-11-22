@@ -235,7 +235,6 @@ outterLoop:
 
 	// Execute bazel build.
 	for target, _ := range targets {
-		fmt.Printf("Build bazel target %s.\n", target)
 		exec.RunBazelBuild(dirs.Workspace, target)
 	}
 
