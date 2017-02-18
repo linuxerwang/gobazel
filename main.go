@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/hanwen/go-fuse/fuse/nodefs"
@@ -143,7 +144,7 @@ func main() {
 
 	// Handle ctl+c.
 	c := make(chan os.Signal, 1)
-	signal.Notify(c, os.Interrupt)
+	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
 	go func() {
 		for {
 			<-c
