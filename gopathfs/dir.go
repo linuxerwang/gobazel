@@ -42,7 +42,7 @@ func (gpf *GoPathFs) Mkdir(name string, mode uint32, context *fuse.Context) fuse
 		return gpf.mkFirstPartyChildDir(name[len(prefix):], mode, context)
 	}
 
-	return fuse.ENOSYS
+	return gpf.mkThirdPartyChildDir(name, mode, context)
 }
 
 // Rmdir overwrites the parent's Rmdir method.
@@ -52,7 +52,7 @@ func (gpf *GoPathFs) Rmdir(name string, context *fuse.Context) fuse.Status {
 		return gpf.rmFirstPartyChildDir(name[len(prefix):], context)
 	}
 
-	return fuse.ENOSYS
+	return gpf.rmThirdPartyChildDir(name, context)
 }
 
 func (gpf *GoPathFs) openTopDir() ([]fuse.DirEntry, fuse.Status) {
@@ -169,8 +169,32 @@ func (gpf *GoPathFs) mkFirstPartyChildDir(name string, mode uint32, context *fus
 	return fuse.OK
 }
 
+func (gpf *GoPathFs) mkThirdPartyChildDir(name string, mode uint32, context *fuse.Context) fuse.Status {
+	if len(gpf.cfg.Vendors) == 0 {
+		return fuse.ENOENT
+	}
+
+	name = filepath.Join(gpf.dirs.Workspace, gpf.cfg.Vendors[0], name)
+	if err := os.MkdirAll(name, os.FileMode(mode)); err != nil {
+		return fuse.ENOENT
+	}
+	return fuse.OK
+}
+
 func (gpf *GoPathFs) rmFirstPartyChildDir(name string, context *fuse.Context) fuse.Status {
 	name = filepath.Join(gpf.dirs.Workspace, name)
+	if err := os.RemoveAll(name); err != nil {
+		return fuse.ENOENT
+	}
+	return fuse.OK
+}
+
+func (gpf *GoPathFs) rmThirdPartyChildDir(name string, context *fuse.Context) fuse.Status {
+	if len(gpf.cfg.Vendors) == 0 {
+		return fuse.ENOENT
+	}
+
+	name = filepath.Join(gpf.dirs.Workspace, gpf.cfg.Vendors[0], name)
 	if err := os.RemoveAll(name); err != nil {
 		return fuse.ENOENT
 	}

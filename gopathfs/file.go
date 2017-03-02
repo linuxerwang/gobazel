@@ -45,7 +45,7 @@ func (gpf *GoPathFs) Create(name string, flags uint32, mode uint32,
 		return gpf.createFirstPartyChildFile(name[len(prefix):], flags, mode, context)
 	}
 
-	return nil, fuse.ENOSYS
+	return gpf.createThirdPartyChildFile(name, flags, mode, context)
 }
 
 // Unlink overwrites the parent's Unlink method.
@@ -170,6 +170,31 @@ func (gpf *GoPathFs) createFirstPartyChildFile(name string, flags uint32, mode u
 
 	name = filepath.Join(gpf.dirs.Workspace, name)
 
+	if gpf.debug {
+		fmt.Printf("Actually creating file %s.\n", name)
+	}
+
+	f, err := os.Create(name)
+	if err != nil {
+		if gpf.debug {
+			fmt.Printf("Failed to create file %s.\n", name)
+		}
+		return nil, fuse.EIO
+	}
+
+	if gpf.debug {
+		fmt.Printf("Succeeded to create file %s.\n", name)
+	}
+	return nodefs.NewLoopbackFile(f), fuse.OK
+}
+
+func (gpf *GoPathFs) createThirdPartyChildFile(name string, flags uint32, mode uint32,
+	context *fuse.Context) (file nodefs.File, code fuse.Status) {
+	if len(gpf.cfg.Vendors) == 0 {
+		return nil, fuse.EIO
+	}
+
+	name = filepath.Join(gpf.dirs.Workspace, gpf.cfg.Vendors[0], name)
 	if gpf.debug {
 		fmt.Printf("Actually creating file %s.\n", name)
 	}
