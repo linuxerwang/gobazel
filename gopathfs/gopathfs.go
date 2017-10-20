@@ -40,7 +40,7 @@ func (gpf *GoPathFs) Access(name string, mode uint32, context *fuse.Context) (co
 // OnMount overwrites the parent's OnMount method.
 func (gpf *GoPathFs) OnMount(nodeFs *pathfs.PathNodeFs) {
 	if err := notify.Watch(filepath.Join(gpf.dirs.Workspace, "..."), gpf.notifyCh,
-		notify.InCloseWrite, notify.InMovedTo); err != nil {
+		notify.All); err != nil {
 
 		log.Fatal(err)
 	}
@@ -48,12 +48,7 @@ func (gpf *GoPathFs) OnMount(nodeFs *pathfs.PathNodeFs) {
 	go func() {
 		for ei := range gpf.notifyCh {
 			path := ei.Path()[len(gpf.dirs.Workspace+"/"):]
-			switch ei.Event() {
-			case notify.InCloseWrite:
-				gpf.notifyFileChange(nodeFs, path)
-			case notify.InMovedTo:
-				gpf.notifyFileChange(nodeFs, path)
-			}
+			gpf.notifyFileChange(nodeFs, path)
 		}
 	}()
 }
