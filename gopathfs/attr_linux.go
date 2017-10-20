@@ -1,10 +1,9 @@
 package gopathfs
 
-import(
+import (
 	"github.com/hanwen/go-fuse/fuse"
 	"golang.org/x/sys/unix"
 )
-
 
 func unixAttrToFuseAttr(from unix.Stat_t) (result fuse.Attr) {
 	result.Ino = from.Ino
