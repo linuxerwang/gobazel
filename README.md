@@ -167,7 +167,8 @@ Flag --debug enables gobazel to print out verbose debug information.
 
 ## Caveates
 
-- It only works on Linux. It requires FUSE, fsnotify.
+- At present it only works on Linux and OSX (thanks excavador for adding the OSX
+    support). It requires FUSE, fsnotify.
 
 - It works for Golang programming with bazel. Might also work for Java
 	after code change (not planned for now).
