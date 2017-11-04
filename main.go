@@ -176,7 +176,7 @@ func main() {
 		// If a Go IDE is specified, start it with the proper GOPATH.
 		if cfg.GoIdeCmd != "" {
 			fmt.Println("\nStarting IDE ...")
-			if err := exec.RunCommand(cfg, cfg.GoIdeCmd); err != nil {
+			if err := exec.RunCommand(cfg, cfg.GoIdeCmd+" "+dirs.SrcDir); err != nil {
 				fmt.Println("Error to run IDE, ", err)
 			}
 		}
