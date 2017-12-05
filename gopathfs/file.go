@@ -182,6 +182,10 @@ func (gpf *GoPathFs) createFirstPartyChildFile(name string, flags uint32, mode u
 		return nil, fuse.EIO
 	}
 
+	if err = os.Chmod(name, os.FileMode(mode)); err != nil {
+		fmt.Printf("Fail to chmod. file: %s, mode: %s, err: %#v.", name, os.FileMode(mode).String(), err)
+	}
+
 	if gpf.debug {
 		fmt.Printf("Succeeded to create file %s.\n", name)
 	}
@@ -205,6 +209,10 @@ func (gpf *GoPathFs) createThirdPartyChildFile(name string, flags uint32, mode u
 			fmt.Printf("Failed to create file %s.\n", name)
 		}
 		return nil, fuse.EIO
+	}
+
+	if err = os.Chmod(name, os.FileMode(mode)); err != nil {
+		fmt.Printf("Fail to chmod. file: %s, mode: %s, err: %#v.", name, os.FileMode(mode).String(), err)
 	}
 
 	if gpf.debug {
