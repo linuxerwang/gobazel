@@ -29,6 +29,17 @@ func (gpf *GoPathFs) GetAttr(name string, context *fuse.Context) (*fuse.Attr, fu
 		}
 	}
 
+	// Search in fall-through directories.
+	for _, v := range gpf.cfg.FallThrough {
+		if name == v || strings.HasPrefix(name, v) {
+			attr, status := gpf.getRealDirAttr(filepath.Join(gpf.dirs.Workspace, name))
+			if status == fuse.OK {
+				return attr, fuse.OK
+			}
+			return nil, fuse.ENOENT
+		}
+	}
+
 	// Search in vendor directories.
 	for _, v := range gpf.cfg.Vendors {
 		fname := filepath.Join(gpf.dirs.Workspace, v, name)

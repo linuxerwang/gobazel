@@ -235,7 +235,7 @@ outterLoop:
 	}
 
 	// Execute bazel build.
-	for target, _ := range targets {
+	for target := range targets {
 		exec.RunBazelBuild(dirs.Workspace, target)
 	}
 

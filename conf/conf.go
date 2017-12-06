@@ -20,6 +20,7 @@ type GobazelConf struct {
 	GoIdeCmd    string     `cfg-attr:"go-ide-cmd"`
 	Ignores     []string   `cfg-attr:"ignore-dirs"`
 	Vendors     []string   `cfg-attr:"vendor-dirs"`
+	FallThrough []string   `cfg-attr:"fall-through-dirs"`
 	Build       *BuildConf `cfg-attr:"build"`
 }
 

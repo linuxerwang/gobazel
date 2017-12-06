@@ -1,6 +1,7 @@
 package gopathfs
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -22,9 +23,21 @@ func (gpf *GoPathFs) OpenDir(name string, context *fuse.Context) ([]fuse.DirEntr
 		return gpf.openFirstPartyChildDir(name)
 	}
 
-	// Search in vendor directories.
 	entries := []fuse.DirEntry{}
 	var status fuse.Status
+
+	// Search in fall-through directories.
+	for _, dir := range gpf.cfg.FallThrough {
+		if dir == name || strings.HasPrefix(name, dir) {
+			entries, status = gpf.openUnderlyingDir(filepath.Join(gpf.dirs.Workspace, name), entries)
+			if status == fuse.OK {
+				return entries, fuse.OK
+			}
+			return nil, fuse.ENOENT
+		}
+	}
+
+	// Search in vendor directories.
 	for _, vendor := range gpf.cfg.Vendors {
 		entries, status = gpf.openVendorChildDir(vendor, name, entries)
 		if status == fuse.OK {
@@ -66,6 +79,25 @@ func (gpf *GoPathFs) openTopDir() ([]fuse.DirEntry, fuse.Status) {
 	// Vendor directories.
 	for _, vendor := range gpf.cfg.Vendors {
 		entries, _ = gpf.openUnderlyingDir(filepath.Join(gpf.dirs.Workspace, vendor), entries)
+	}
+
+	// Fall-through directories.
+	for _, dir := range gpf.cfg.FallThrough {
+		dir = filepath.Join(gpf.dirs.Workspace, dir)
+		fi, err := os.Stat(dir)
+		if err != nil {
+			fmt.Printf("Failed to access %s, %v", dir, err)
+			continue
+		}
+
+		entry := fuse.DirEntry{
+			Name: fi.Name(),
+			Mode: fuse.S_IFREG,
+		}
+		if fi.IsDir() {
+			entry.Mode = fuse.S_IFDIR
+		}
+		entries = append(entries, entry)
 	}
 
 	return entries, fuse.OK

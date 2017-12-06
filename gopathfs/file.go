@@ -21,6 +21,17 @@ func (gpf *GoPathFs) Open(name string, flags uint32, context *fuse.Context) (fil
 		return gpf.openFirstPartyChildFile(name, flags, context)
 	}
 
+	// Search in fall-through directories.
+	for _, path := range gpf.cfg.FallThrough {
+		if path == name || strings.HasPrefix(name, path) {
+			f, status := gpf.openUnderlyingFile(filepath.Join(gpf.dirs.Workspace, name), flags, context)
+			if status == fuse.OK {
+				return f, status
+			}
+			return nil, fuse.ENOENT
+		}
+	}
+
 	// Search in vendor directories.
 	for _, vendor := range gpf.cfg.Vendors {
 		f, status := gpf.openVendorChildFile(vendor, name, flags, context)
