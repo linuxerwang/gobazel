@@ -29,11 +29,12 @@ func (gpf *GoPathFs) OpenDir(name string, context *fuse.Context) ([]fuse.DirEntr
 	// Search in fall-through directories.
 	for _, dir := range gpf.cfg.FallThrough {
 		if dir == name || strings.HasPrefix(name, dir) {
-			entries, status = gpf.openUnderlyingDir(filepath.Join(gpf.dirs.Workspace, name), entries)
+			fname := filepath.Join(gpf.dirs.Workspace, name)
+			entries, status = gpf.openUnderlyingDir(fname, nil /* excludes */, entries)
 			if status == fuse.OK {
 				return entries, fuse.OK
 			}
-			return nil, fuse.ENOENT
+			fmt.Printf("failed to open entry %s\n", fname)
 		}
 	}
 
@@ -78,7 +79,7 @@ func (gpf *GoPathFs) openTopDir() ([]fuse.DirEntry, fuse.Status) {
 
 	// Vendor directories.
 	for _, vendor := range gpf.cfg.Vendors {
-		entries, _ = gpf.openUnderlyingDir(filepath.Join(gpf.dirs.Workspace, vendor), entries)
+		entries, _ = gpf.openUnderlyingDir(filepath.Join(gpf.dirs.Workspace, vendor), gpf.cfg.FallThroughSet /* excludes */, entries)
 	}
 
 	// Fall-through directories.
@@ -142,22 +143,22 @@ func (gpf *GoPathFs) openFirstPartyChildDir(name string) ([]fuse.DirEntry, fuse.
 	name = name[len(gpf.cfg.GoPkgPrefix+"/"):]
 	entries := []fuse.DirEntry{}
 
-	entries, _ = gpf.openUnderlyingDir(filepath.Join(gpf.dirs.Workspace, name), entries)
+	entries, _ = gpf.openUnderlyingDir(filepath.Join(gpf.dirs.Workspace, name), gpf.cfg.FallThroughSet /* excludes */, entries)
 	// Also search in bazel-genfiles.
-	entries, _ = gpf.openUnderlyingDir(filepath.Join(gpf.dirs.Workspace, "bazel-genfiles", name), entries)
+	entries, _ = gpf.openUnderlyingDir(filepath.Join(gpf.dirs.Workspace, "bazel-genfiles", name), gpf.cfg.FallThroughSet /* excludes */, entries)
 
 	return entries, fuse.OK
 }
 
 func (gpf *GoPathFs) openVendorChildDir(vendor, name string, entries []fuse.DirEntry) ([]fuse.DirEntry, fuse.Status) {
-	entries, _ = gpf.openUnderlyingDir(filepath.Join(gpf.dirs.Workspace, vendor, name), entries)
+	entries, _ = gpf.openUnderlyingDir(filepath.Join(gpf.dirs.Workspace, vendor, name), gpf.cfg.FallThroughSet /* excludes */, entries)
 	// Also search in bazel-genfiles.
-	entries, _ = gpf.openUnderlyingDir(filepath.Join(gpf.dirs.Workspace, "bazel-genfiles", vendor, name), entries)
+	entries, _ = gpf.openUnderlyingDir(filepath.Join(gpf.dirs.Workspace, "bazel-genfiles", vendor, name), gpf.cfg.FallThroughSet /* excludes */, entries)
 
 	return entries, fuse.OK
 }
 
-func (gpf *GoPathFs) openUnderlyingDir(dir string, entries []fuse.DirEntry) ([]fuse.DirEntry, fuse.Status) {
+func (gpf *GoPathFs) openUnderlyingDir(dir string, excludes map[string]struct{}, entries []fuse.DirEntry) ([]fuse.DirEntry, fuse.Status) {
 	h, err := os.Open(dir)
 	if err != nil {
 		return entries, fuse.ENOENT
@@ -172,9 +173,15 @@ func (gpf *GoPathFs) openUnderlyingDir(dir string, entries []fuse.DirEntry) ([]f
 outterLoop:
 	for _, fi := range fis {
 		if fi.IsDir() {
-			// The generated folder has the same name as the original one.
 			for _, e := range entries {
 				if fi.Name() == e.Name {
+					// The generated folder has the same name as the original
+					// one.
+					continue outterLoop
+				}
+				if _, ok := excludes[fi.Name()]; ok {
+					// The folder should be excluded, e.g., when it has the same
+					// name as a fall-through folder.
 					continue outterLoop
 				}
 			}

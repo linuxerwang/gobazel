@@ -22,6 +22,10 @@ type GobazelConf struct {
 	Vendors     []string   `cfg-attr:"vendor-dirs"`
 	FallThrough []string   `cfg-attr:"fall-through-dirs"`
 	Build       *BuildConf `cfg-attr:"build"`
+
+	IgnoreSet      map[string]struct{}
+	VendorSet      map[string]struct{}
+	FallThroughSet map[string]struct{}
 }
 
 type confWrapper struct {
@@ -35,5 +39,16 @@ func LoadConfig(cfgPath string) *GobazelConf {
 		fmt.Printf("Failed to parse gobazel config file %s, %+v.\n", cfgPath, err)
 		os.Exit(2)
 	}
+	cfg.Conf.IgnoreSet = toSet(cfg.Conf.Ignores)
+	cfg.Conf.VendorSet = toSet(cfg.Conf.Vendors)
+	cfg.Conf.FallThroughSet = toSet(cfg.Conf.FallThrough)
 	return cfg.Conf
+}
+
+func toSet(slice []string) map[string]struct{} {
+	set := map[string]struct{}{}
+	for _, ele := range slice {
+		set[ele] = struct{}{}
+	}
+	return set
 }
