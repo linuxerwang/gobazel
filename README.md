@@ -169,7 +169,7 @@ gobazel {
 
 Flag --debug enables gobazel to print out verbose debug information.
 
-## Remove Debug with Delve (dlv)
+## Remote Debug with Delve (dlv)
 
 Start your binary with dlv:
 
