@@ -125,6 +125,15 @@ func (gpf *GoPathFs) openFirstPartyChildFile(name string, flags uint32,
 
 	name = name[len(gpf.cfg.GoPkgPrefix+"/"):]
 
+	// Search in GOROOT (for debugger).
+	if name == "GOROOT" || strings.HasPrefix(name, "GOROOT"+pathSeparator) {
+		f, status := gpf.openUnderlyingFile(filepath.Join(gpf.dirs.GoSDKDir, name[len("GOROOT"):]), flags, context)
+		if status == fuse.OK {
+			return f, status
+		}
+		return nil, fuse.ENOENT
+	}
+
 	f, status := gpf.openUnderlyingFile(filepath.Join(gpf.dirs.Workspace, name), flags, context)
 	if status == fuse.OK {
 		return f, status

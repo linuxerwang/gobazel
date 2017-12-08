@@ -1,7 +1,9 @@
 package gopathfs
 
 import (
+	"fmt"
 	"log"
+	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -13,13 +15,18 @@ import (
 	"github.com/rjeczalik/notify"
 )
 
+var (
+	pathSeparator = string(os.PathSeparator)
+)
+
 // Dirs contains directory paths for GoPathFs.
 type Dirs struct {
-	Workspace string
-	GobzlConf string
-	BinDir    string
-	PkgDir    string
-	SrcDir    string
+	Workspace   string
+	GobzlConf   string
+	BinDir      string
+	PkgDir      string
+	SrcDir      string
+	GoSDKDir    string
 }
 
 // GoPathFs implements a virtual tree for src folder of GOPATH.
@@ -124,7 +131,7 @@ func NewGoPathFs(debug bool, cfg *conf.GobazelConf, dirs *Dirs) *GoPathFs {
 		ignoreRegexes[i] = regexp.MustCompile(ign)
 	}
 
-	return &GoPathFs{
+	gpfs := GoPathFs{
 		FileSystem:    pathfs.NewDefaultFileSystem(),
 		debug:         debug,
 		dirs:          dirs,
@@ -132,4 +139,24 @@ func NewGoPathFs(debug bool, cfg *conf.GobazelConf, dirs *Dirs) *GoPathFs {
 		ignoreRegexes: ignoreRegexes,
 		notifyCh:      make(chan notify.EventInfo, 10),
 	}
+
+	// Find the go-sdk in bazel external folder. The debugger can use the same
+	// go-sdk source code for debugging.
+	found := false
+	if fi, err := os.Lstat("bazel-out"); err == nil {
+		if fi.Mode()&os.ModeSymlink != 0 {
+			if target, err := os.Readlink("bazel-out"); err == nil {
+				target = filepath.ToSlash(target)
+				if strings.HasSuffix(target, "/execroot/__main__/bazel-out") {
+					gpfs.dirs.GoSDKDir = filepath.Join(target[:len(target)-len("/execroot/__main__/bazel-out")], "external/go_sdk")
+					found = true
+				}
+			}
+		}
+	}
+	if !found {
+		fmt.Println("Could not find symbolic link \"bazel-out\", debugger will not find Go SDK source codes.")
+	}
+
+	return &gpfs
 }

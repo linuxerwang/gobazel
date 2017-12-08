@@ -35,6 +35,7 @@ func (gpf *GoPathFs) OpenDir(name string, context *fuse.Context) ([]fuse.DirEntr
 				return entries, fuse.OK
 			}
 			fmt.Printf("failed to open entry %s\n", fname)
+			return nil, fuse.ENOENT
 		}
 	}
 
@@ -142,6 +143,17 @@ func (gpf *GoPathFs) openFirstPartyDir() ([]fuse.DirEntry, fuse.Status) {
 func (gpf *GoPathFs) openFirstPartyChildDir(name string) ([]fuse.DirEntry, fuse.Status) {
 	name = name[len(gpf.cfg.GoPkgPrefix+"/"):]
 	entries := []fuse.DirEntry{}
+
+	// Search in GOROOT (for debugger).
+	if name == "GOROOT" || strings.HasPrefix(name, "GOROOT"+pathSeparator) {
+		fname := filepath.Join(gpf.dirs.GoSDKDir, name[len("GOROOT"):])
+		entries, status := gpf.openUnderlyingDir(fname, nil /* excludes */, entries)
+		if status == fuse.OK {
+			return entries, fuse.OK
+		}
+		fmt.Printf("failed to open entry %s\n", fname)
+		return nil, fuse.ENOENT
+	}
 
 	entries, _ = gpf.openUnderlyingDir(filepath.Join(gpf.dirs.Workspace, name), gpf.cfg.FallThroughSet /* excludes */, entries)
 	// Also search in bazel-genfiles.

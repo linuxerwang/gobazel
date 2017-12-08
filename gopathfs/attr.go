@@ -68,6 +68,11 @@ func (gpf *GoPathFs) getFirstPartyDirAttr() (*fuse.Attr, fuse.Status) {
 }
 
 func (gpf *GoPathFs) getFirstPartyChildDirAttr(name string) (*fuse.Attr, fuse.Status) {
+	// Search in GOROOT (for debugger).
+	if name == "GOROOT" || strings.HasPrefix(name, "GOROOT"+pathSeparator) {
+		return gpf.getRealDirAttr(filepath.Join(gpf.dirs.GoSDKDir, name[len("GOROOT"):]))
+	}
+
 	nm := filepath.Join(gpf.dirs.Workspace, name)
 	attr, status := gpf.getRealDirAttr(name)
 	if status == fuse.OK {
