@@ -17,7 +17,7 @@ func (gpf *GoPathFs) Open(name string, flags uint32, context *fuse.Context) (fil
 		fmt.Printf("\nReqeusted to open file %s.\n", name)
 	}
 
-	if strings.HasPrefix(name, gpf.cfg.GoPkgPrefix+"/") {
+	if strings.HasPrefix(name, gpf.cfg.GoPkgPrefix+pathSeparator) {
 		return gpf.openFirstPartyChildFile(name, flags, context)
 	}
 
@@ -51,7 +51,7 @@ func (gpf *GoPathFs) Create(name string, flags uint32, mode uint32,
 		fmt.Printf("\nReqeusted to create file %s.\n", name)
 	}
 
-	prefix := gpf.cfg.GoPkgPrefix + "/"
+	prefix := gpf.cfg.GoPkgPrefix + pathSeparator
 	if strings.HasPrefix(name, prefix) {
 		return gpf.createFirstPartyChildFile(name[len(prefix):], flags, mode, context)
 	}
@@ -65,7 +65,7 @@ func (gpf *GoPathFs) Unlink(name string, context *fuse.Context) (code fuse.Statu
 		fmt.Printf("\nReqeusted to unlink file %s.\n", name)
 	}
 
-	prefix := gpf.cfg.GoPkgPrefix + "/"
+	prefix := gpf.cfg.GoPkgPrefix + pathSeparator
 	if strings.HasPrefix(name, prefix) {
 		name = filepath.Join(gpf.dirs.Workspace, name[len(prefix):])
 		return gpf.unlinkUnderlyingFile(name, context)
@@ -88,9 +88,9 @@ func (gpf *GoPathFs) Rename(oldName string, newName string, context *fuse.Contex
 		fmt.Printf("\nReqeusted to rename from %s to %s.\n", oldName, newName)
 	}
 
-	if strings.HasPrefix(oldName, "jingoal.com/") {
-		oldName = filepath.Join(gpf.dirs.Workspace, oldName[len("jingoal.com/"):])
-		newName = filepath.Join(gpf.dirs.Workspace, newName[len("jingoal.com/"):])
+	if strings.HasPrefix(oldName, gpf.cfg.GoPkgPrefix+pathSeparator) {
+		oldName = filepath.Join(gpf.dirs.Workspace, oldName[len(gpf.cfg.GoPkgPrefix):])
+		newName = filepath.Join(gpf.dirs.Workspace, newName[len(gpf.cfg.GoPkgPrefix):])
 	} else {
 		// Vendor directories.
 		for _, vendor := range gpf.cfg.Vendors {
@@ -123,7 +123,7 @@ func (gpf *GoPathFs) Rename(oldName string, newName string, context *fuse.Contex
 func (gpf *GoPathFs) openFirstPartyChildFile(name string, flags uint32,
 	context *fuse.Context) (file nodefs.File, code fuse.Status) {
 
-	name = name[len(gpf.cfg.GoPkgPrefix+"/"):]
+	name = name[len(gpf.cfg.GoPkgPrefix+pathSeparator):]
 
 	// Search in GOROOT (for debugger).
 	if name == "GOROOT" || strings.HasPrefix(name, "GOROOT"+pathSeparator) {

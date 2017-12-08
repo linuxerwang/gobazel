@@ -20,7 +20,7 @@ func (gpf *GoPathFs) GetAttr(name string, context *fuse.Context) (*fuse.Attr, fu
 	}
 
 	// Handle the children of the virtual Golang prefix package.
-	prefix := gpf.cfg.GoPkgPrefix + "/"
+	prefix := gpf.cfg.GoPkgPrefix + pathSeparator
 	if strings.HasPrefix(name, prefix) {
 		name = name[len(prefix):]
 		attr, status := gpf.getFirstPartyChildDirAttr(name)

@@ -21,12 +21,12 @@ var (
 
 // Dirs contains directory paths for GoPathFs.
 type Dirs struct {
-	Workspace   string
-	GobzlConf   string
-	BinDir      string
-	PkgDir      string
-	SrcDir      string
-	GoSDKDir    string
+	Workspace string
+	GobzlConf string
+	BinDir    string
+	PkgDir    string
+	SrcDir    string
+	GoSDKDir  string
 }
 
 // GoPathFs implements a virtual tree for src folder of GOPATH.
@@ -52,7 +52,7 @@ func (gpf *GoPathFs) OnMount(nodeFs *pathfs.PathNodeFs) {
 
 	go func() {
 		for ei := range gpf.notifyCh {
-			path := ei.Path()[len(gpf.dirs.Workspace+"/"):]
+			path := ei.Path()[len(gpf.dirs.Workspace+pathSeparator):]
 			gpf.notifyFileChange(nodeFs, path)
 		}
 	}()
@@ -68,7 +68,7 @@ func (gpf *GoPathFs) notifyFileChange(nodeFs *pathfs.PathNodeFs, path string) {
 		return
 	}
 
-	if strings.HasSuffix(path, "/.git") || strings.Contains(path, "/.git/") {
+	if strings.HasSuffix(path, pathSeparator+".git") || strings.Contains(path, pathSeparator+".git"+pathSeparator) {
 		return
 	}
 
@@ -76,9 +76,9 @@ func (gpf *GoPathFs) notifyFileChange(nodeFs *pathfs.PathNodeFs, path string) {
 
 	isVendor := false
 	for _, vendor := range gpf.cfg.Vendors {
-		if strings.HasPrefix(path, vendor+"/") {
+		if strings.HasPrefix(path, vendor+pathSeparator) {
 			isVendor = true
-			nodeFs.FileNotify(path[len(vendor+"/"):], 0, 0)
+			nodeFs.FileNotify(path[len(vendor+pathSeparator):], 0, 0)
 			break
 		}
 	}
@@ -117,7 +117,7 @@ func (gpf *GoPathFs) isVendorDir(dir string) bool {
 		if dir == vendor {
 			return true
 		}
-		if strings.HasPrefix(dir, vendor+"/") {
+		if strings.HasPrefix(dir, vendor+pathSeparator) {
 			return true
 		}
 	}
@@ -147,8 +147,9 @@ func NewGoPathFs(debug bool, cfg *conf.GobazelConf, dirs *Dirs) *GoPathFs {
 		if fi.Mode()&os.ModeSymlink != 0 {
 			if target, err := os.Readlink("bazel-out"); err == nil {
 				target = filepath.ToSlash(target)
-				if strings.HasSuffix(target, "/execroot/__main__/bazel-out") {
-					gpfs.dirs.GoSDKDir = filepath.Join(target[:len(target)-len("/execroot/__main__/bazel-out")], "external/go_sdk")
+				suffix := filepath.Join("execroot", "__main__", "bazel-out")
+				if strings.HasSuffix(target, suffix) {
+					gpfs.dirs.GoSDKDir = filepath.Join(target[:len(target)-len(suffix)], "external", "go_sdk")
 					found = true
 				}
 			}

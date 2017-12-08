@@ -19,7 +19,7 @@ func (gpf *GoPathFs) OpenDir(name string, context *fuse.Context) ([]fuse.DirEntr
 		return gpf.openFirstPartyDir()
 	}
 
-	if strings.HasPrefix(name, gpf.cfg.GoPkgPrefix+"/") {
+	if strings.HasPrefix(name, gpf.cfg.GoPkgPrefix+pathSeparator) {
 		return gpf.openFirstPartyChildDir(name)
 	}
 
@@ -52,7 +52,7 @@ func (gpf *GoPathFs) OpenDir(name string, context *fuse.Context) ([]fuse.DirEntr
 
 // Mkdir overwrites the parent's Mkdir method.
 func (gpf *GoPathFs) Mkdir(name string, mode uint32, context *fuse.Context) fuse.Status {
-	prefix := gpf.cfg.GoPkgPrefix + "/"
+	prefix := gpf.cfg.GoPkgPrefix + pathSeparator
 	if strings.HasPrefix(name, prefix) {
 		return gpf.mkFirstPartyChildDir(name[len(prefix):], mode, context)
 	}
@@ -62,7 +62,7 @@ func (gpf *GoPathFs) Mkdir(name string, mode uint32, context *fuse.Context) fuse
 
 // Rmdir overwrites the parent's Rmdir method.
 func (gpf *GoPathFs) Rmdir(name string, context *fuse.Context) fuse.Status {
-	prefix := gpf.cfg.GoPkgPrefix + "/"
+	prefix := gpf.cfg.GoPkgPrefix + pathSeparator
 	if strings.HasPrefix(name, prefix) {
 		return gpf.rmFirstPartyChildDir(name[len(prefix):], context)
 	}
@@ -141,7 +141,7 @@ func (gpf *GoPathFs) openFirstPartyDir() ([]fuse.DirEntry, fuse.Status) {
 }
 
 func (gpf *GoPathFs) openFirstPartyChildDir(name string) ([]fuse.DirEntry, fuse.Status) {
-	name = name[len(gpf.cfg.GoPkgPrefix+"/"):]
+	name = name[len(gpf.cfg.GoPkgPrefix+pathSeparator):]
 	entries := []fuse.DirEntry{}
 
 	// Search in GOROOT (for debugger).

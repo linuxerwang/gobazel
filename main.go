@@ -23,7 +23,9 @@ const (
 	initialConf = `gobazel {
     go-path: ""
     go-pkg-prefix: "test.com"
-    go-ide-cmd: ""
+    # go-ide-cmd: "/usr/bin/atom"
+    go-ide-cmd: "/usr/bin/code"
+    # go-ide-cmd: "/usr/bin/liteide"
 
     build {
         rules: [
@@ -41,6 +43,10 @@ const (
     ignore-dirs: [
         "bazel-.*",
         "third-party.*",
+    ]
+
+    fall-through-dirs: [
+        ".vscode",
     ]
 }
 `

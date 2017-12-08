@@ -133,6 +133,10 @@ gobazel {
         "bazel-.*",
         "third-party.*",
     ]
+
+    fall-through-dirs: [
+        ".vscode",
+    ]
 }
 ```
 
@@ -164,6 +168,65 @@ gobazel {
 ```
 
 Flag --debug enables gobazel to print out verbose debug information.
+
+## Remove Debug with Delve (dlv)
+
+Start your binary with dlv:
+
+```bash
+$ dlv exec bazel-bin/myserver/cmd/myserver/myserver --headless --listen=:2345 --log [-- <other-args>]
+```
+
+In VS code, add a debug configuration:
+
+```js
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "bazel-bin/myserver/cmd/myserver/myserver",
+            "type": "go",
+            "request": "launch",
+            "mode": "remote",
+            "remotePath": "/home/linuxerwang/.cache/bazel/_bazel_linuxerwang/eedeac95b950221f7e2a454b8c435113/bazel-sandbox/93167466216111235/execroot/__main__",
+            "port": 2345,
+            "host": "127.0.0.1",
+            "program": "${workspaceRoot}/mycompany.com",
+            "env": {},
+            "args": []
+        }
+    ]
+}
+```
+
+The "remotePath" field can be extracted with gdb:
+
+```
+$ gdb bazel-bin/myserver/cmd/myserver/myserver -batch -ex "list" -ex "info source"
+warning: Missing auto-load script at offset 0 in section .debug_gdb_scripts of file /home/linuxerwang/.cache/bazel/_bazel_linuxerwang/eedeac95b950221f7e2a454b8c435113/execroot/__main__/bazel-out/k8-dbg/bin/myserver/cmd/myserver/myserver.
+Use `info auto-load python-scripts [REGEXP]' to list them.
+warning: Source file is more recent than executable.
+24              flagFile        = flag.String("f", "", "The CSV file")
+25
+26              success, failure int32
+27      )
+28
+29      func usage() {
+30              fmt.Println("Usage:")
+Current source file is myserver/cmd/myserver/main.go
+Compilation directory is /home/linuxerwang/.cache/bazel/_bazel_linuxerwang/eedeac95b950221f7e2a454b8c435113/bazel-sandbox/93167466216111235/execroot/__main__
+Located in /home/linuxerwang/my-client/myserver/cmd/myserver/main.go
+Contains 129 lines.
+Source language is asm.
+Producer is Go cmd/compile go1.9.2.
+Compiled with DWARF 2 debugging format.
+Does not include preprocessor macro info.
+```
+
+Note that the path is in the line starting with "Compilation directory".
+
+Now you can do remote debug in vscode with F5. It can trace the Go-SDK (using
+the Go-SDK in bazel external directory) and third party code correctly.
 
 ## Caveates
 
