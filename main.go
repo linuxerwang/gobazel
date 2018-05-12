@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	osexec "os/exec"
 	"os/signal"
 	"path/filepath"
 	"regexp"
@@ -54,8 +55,9 @@ const (
 )
 
 var (
-	debug = flag.Bool("debug", false, "Enable debug output.")
-	build = flag.Bool("build", false, "Build all packages.")
+	debug    = flag.Bool("debug", false, "Enable debug output.")
+	build    = flag.Bool("build", false, "Build all packages.")
+	detached = flag.Bool("detached", false, "To detach from parent process. Do not set it manually, it's only used by gobazel to detach itself.")
 
 	dirs    gopathfs.Dirs
 	version string
@@ -93,6 +95,16 @@ Options:`)
 func main() {
 	flag.Usage = usage
 	flag.Parse()
+
+	if !*detached {
+		pid, err := detach()
+		if err != nil {
+			fmt.Println(err)
+			os.Exit(2)
+		}
+		fmt.Printf("gobazel is running detached. To stop it, run \"kill -SIGQUIT %d\".\n", pid)
+		return
+	}
 
 	for _, arg := range flag.Args() {
 		if strings.ToLower(arg) == "version" {
@@ -150,7 +162,7 @@ func main() {
 
 	// Handle ctl+c.
 	c := make(chan os.Signal, 1)
-	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+	signal.Notify(c, os.Interrupt, syscall.SIGTERM, syscall.SIGHUP, syscall.SIGABRT, syscall.SIGQUIT, syscall.SIGINT)
 	go func() {
 		for {
 			<-c
@@ -249,4 +261,21 @@ outterLoop:
 	for _, proj := range projects {
 		exec.RunGoWalkInstall(cfg, dirs.Workspace, proj)
 	}
+}
+
+func detach() (int, error) {
+	cwd, err := os.Getwd()
+	if err != nil {
+		return 0, err
+	}
+	args := append(os.Args, "--detached")
+	cmd := osexec.Command(args[0], args[1:]...)
+	cmd.Dir = cwd
+	err = cmd.Start()
+	if err != nil {
+		return 0, err
+	}
+	pid := cmd.Process.Pid
+	cmd.Process.Release()
+	return pid, nil
 }
