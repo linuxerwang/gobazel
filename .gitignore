@@ -3,6 +3,9 @@
 *.a
 *.so
 
+*.deb
+debian/usr
+
 # Folders
 _obj
 _test

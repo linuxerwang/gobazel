@@ -1,0 +1,8 @@
+Package: gobazel
+Version: 0.1.9
+Architecture: amd64
+Maintainer: linuxerwang@gmail.com
+Section: utils
+Priority: optional
+Description: A tool to help golang bazel developers to map bazel's folder structure to golang's standard folder structure.
+Installed-Size: 2436

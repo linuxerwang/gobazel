@@ -82,6 +82,8 @@ func usage() {
 
 Usage:
 	gobazel [options]
+	OR to show its version:
+	gobazel version
 
 Note:
 	This command has to be executed in a bazel workspace (where your WORKSPACE file reside).
@@ -96,6 +98,13 @@ func main() {
 	flag.Usage = usage
 	flag.Parse()
 
+	for _, arg := range flag.Args() {
+		if strings.ToLower(arg) == "version" {
+			fmt.Println("Version:", version)
+			return
+		}
+	}
+
 	if !*detached {
 		pid, err := detach()
 		if err != nil {
@@ -104,13 +113,6 @@ func main() {
 		}
 		fmt.Printf("gobazel is running detached. To stop it, run \"kill -SIGQUIT %d\".\n", pid)
 		return
-	}
-
-	for _, arg := range flag.Args() {
-		if strings.ToLower(arg) == "version" {
-			fmt.Println("Version:", version)
-			return
-		}
 	}
 
 	// The command has to be executed in a bazel workspace.
