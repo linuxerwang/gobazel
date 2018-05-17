@@ -9,6 +9,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -54,6 +55,12 @@ const (
 	bzlQuery = "kind(%s, deps(%s/...))"
 )
 
+const (
+	gobzlPidFile = ".gobazelpid"
+	gobzlRcFile  = ".gobazelrc"
+	bzlWsFile    = "WORKSPACE"
+)
+
 var (
 	debug    = flag.Bool("debug", false, "Enable debug output.")
 	build    = flag.Bool("build", false, "Build all packages.")
@@ -75,7 +82,8 @@ func init() {
 
 	// The command has to be executed in a bazel workspace.
 	dirs.Workspace = wd
-	dirs.GobzlConf = filepath.Join(wd, ".gobazelrc")
+	dirs.GobzlConf = filepath.Join(wd, gobzlRcFile)
+	dirs.GobzlPid = filepath.Join(wd, gobzlPidFile)
 }
 
 func usage() {
@@ -106,6 +114,28 @@ func main() {
 		}
 	}
 
+	// The command has to be executed in a bazel workspace.
+	if _, err := os.Stat(filepath.Join(dirs.Workspace, bzlWsFile)); err != nil {
+		fmt.Println("Error, the command has to be run in a bazel workspace,", err)
+		os.Exit(2)
+	}
+
+	for _, arg := range flag.Args() {
+		if strings.ToLower(arg) == "stop" {
+			fmt.Printf("Stopping existing gobazel process for workspace %s.\n", dirs.Workspace)
+			stopExistingProcess()
+			return
+		}
+	}
+
+	cfg := loadConfig()
+
+	if _, err := os.Stat(filepath.Join(dirs.Workspace, gobzlPidFile)); !os.IsNotExist(err) {
+		fmt.Println("File .gobazelpid for another gobazel process exists. Start IDE")
+		startIDE(cfg)
+		return
+	}
+
 	if *daemon && !*detached {
 		pid, err := detach()
 		if err != nil {
@@ -116,43 +146,6 @@ func main() {
 		return
 	}
 
-	// The command has to be executed in a bazel workspace.
-	if _, err := os.Stat(filepath.Join(dirs.Workspace, "WORKSPACE")); err != nil {
-		fmt.Println("Error, the command has to be run in a bazel workspace,", err)
-		os.Exit(2)
-	}
-
-	// File gobazel.cfg holds configurations for gobazel.
-	if _, err := os.Stat(dirs.GobzlConf); err != nil {
-		if os.IsNotExist(err) {
-			if err = ioutil.WriteFile(dirs.GobzlConf, []byte(initialConf), 0644); err != nil {
-				fmt.Printf("Failed to create file %s, %+v.\n", dirs.GobzlConf, err)
-				os.Exit(2)
-			}
-
-			fmt.Printf("Created gobazel config file %s, please customize it and run the command again.\n", dirs.GobzlConf)
-			os.Exit(0)
-		} else {
-			fmt.Println(err)
-		}
-	}
-
-	cfg := conf.LoadConfig(dirs.GobzlConf)
-	if cfg.GoPath == "" {
-		fmt.Println("Error, go-path has to be set in your .gobazelrc file.")
-		os.Exit(2)
-	}
-	if cfg.GoPkgPrefix == "" {
-		fmt.Println("Error, go-pkg-prefix has to be set in your .gobazelrc file.")
-		os.Exit(2)
-	}
-
-	dirs.BinDir = filepath.Join(cfg.GoPath, "bin")
-	os.Mkdir(dirs.BinDir, 0755)
-	dirs.PkgDir = filepath.Join(cfg.GoPath, "pkg")
-	os.Mkdir(dirs.PkgDir, 0755)
-	dirs.SrcDir = filepath.Join(cfg.GoPath, "src")
-	os.Mkdir(dirs.SrcDir, 0755)
 
 	// Create a FUSE virtual file system on dirs.SrcDir.
 	nfs := pathfs.NewPathNodeFs(gopathfs.NewGoPathFs(*debug, cfg, &dirs), nil)
@@ -162,6 +155,11 @@ func main() {
 		os.Exit(2)
 	}
 	fmt.Printf("Mounted bazel source folder to %s. You need to set %s as your GOPATH. \n\n Ctrl+C to exit.\n", dirs.SrcDir, cfg.GoPath)
+
+	if err := ioutil.WriteFile(filepath.Join(dirs.Workspace, gobzlPidFile), []byte(fmt.Sprintf("%d", os.Getpid())), os.ModePerm); err != nil {
+		fmt.Printf("Failed to write to file %s: %v\n", gobzlPidFile, err)
+		os.Exit(2)
+	}
 
 	// Handle ctl+c.
 	c := make(chan os.Signal, 1)
@@ -197,13 +195,47 @@ func main() {
 		// If a Go IDE is specified, start it with the proper GOPATH.
 		if cfg.GoIdeCmd != "" {
 			fmt.Println("\nStarting IDE ...")
-			if err := exec.RunCommand(cfg, cfg.GoIdeCmd+" "+dirs.SrcDir); err != nil {
-				fmt.Println("Error to run IDE, ", err)
-			}
+			startIDE(cfg)
 		}
 	}()
 
 	server.Serve()
+}
+
+func loadConfig() *conf.GobazelConf {
+	// File gobazel.cfg holds configurations for gobazel.
+	if _, err := os.Stat(dirs.GobzlConf); err != nil {
+		if os.IsNotExist(err) {
+			if err = ioutil.WriteFile(dirs.GobzlConf, []byte(initialConf), 0644); err != nil {
+				fmt.Printf("Failed to create file %s, %+v.\n", dirs.GobzlConf, err)
+				os.Exit(2)
+			}
+
+			fmt.Printf("Created gobazel config file %s, please customize it and run the command again.\n", dirs.GobzlConf)
+			os.Exit(0)
+		} else {
+			fmt.Println(err)
+		}
+	}
+
+	cfg := conf.LoadConfig(dirs.GobzlConf)
+	if cfg.GoPath == "" {
+		fmt.Println("Error, go-path has to be set in your .gobazelrc file.")
+		os.Exit(2)
+	}
+	if cfg.GoPkgPrefix == "" {
+		fmt.Println("Error, go-pkg-prefix has to be set in your .gobazelrc file.")
+		os.Exit(2)
+	}
+
+	dirs.BinDir = filepath.Join(cfg.GoPath, "bin")
+	os.Mkdir(dirs.BinDir, 0755)
+	dirs.PkgDir = filepath.Join(cfg.GoPath, "pkg")
+	os.Mkdir(dirs.PkgDir, 0755)
+	dirs.SrcDir = filepath.Join(cfg.GoPath, "src")
+	os.Mkdir(dirs.SrcDir, 0755)
+
+	return cfg
 }
 
 func bazelBuild(cfg *conf.GobazelConf, dirs *gopathfs.Dirs) {
@@ -281,4 +313,51 @@ func detach() (int, error) {
 	pid := cmd.Process.Pid
 	cmd.Process.Release()
 	return pid, nil
+}
+
+func stopExistingProcess() {
+	pidFile := filepath.Join(dirs.Workspace, gobzlPidFile)
+	if _, err := os.Stat(pidFile); err != nil {
+		fmt.Printf("There is no file .gobazelpid in workspace %s.\n", dirs.Workspace)
+		return
+	}
+
+	b, err := ioutil.ReadFile(pidFile)
+	if err != nil {
+		fmt.Printf("Failed to read from .gobazelpid, %v.\n", err)
+		os.Exit(2)
+	}
+
+	pid, err := strconv.ParseInt(strings.TrimSpace(string(b)), 10, 32)
+	if err != nil {
+		fmt.Printf("Invalid pid in .gobazelpid, %v.\n", string(b))
+		os.Exit(2)
+	}
+
+	p, err := os.FindProcess(int(pid))
+	if err != nil {
+		fmt.Printf("Failed to find process %d.\n", pid)
+		os.Remove(pidFile)
+		os.Exit(2)
+	}
+
+	if err := p.Signal(syscall.SIGQUIT); err != nil {
+		fmt.Printf("Failed to send SIGQUIT to process %d.\n", pid)
+		os.Exit(2)
+	}
+
+	// Check if the mount point is still mounted (only works on linux).
+	time.Sleep(time.Second)
+	if b, err := ioutil.ReadFile("/proc/mounts"); err == nil {
+		if idx := strings.Index(string(b), dirs.SrcDir); idx > -1 {
+			osexec.Command("fusermount", "-u", dirs.SrcDir).CombinedOutput()
+		}
+	}
+	os.Remove(pidFile)
+}
+
+func startIDE(cfg *conf.GobazelConf) {
+	if err := exec.RunCommand(cfg, cfg.GoIdeCmd+" "+dirs.SrcDir); err != nil {
+		fmt.Println("Error to run IDE, ", err)
+	}
 }

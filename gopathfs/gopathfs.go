@@ -23,6 +23,7 @@ var (
 type Dirs struct {
 	Workspace string
 	GobzlConf string
+	GobzlPid  string
 	BinDir    string
 	PkgDir    string
 	SrcDir    string
