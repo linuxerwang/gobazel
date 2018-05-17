@@ -57,7 +57,8 @@ const (
 var (
 	debug    = flag.Bool("debug", false, "Enable debug output.")
 	build    = flag.Bool("build", false, "Build all packages.")
-	detached = flag.Bool("detached", false, "To detach from parent process. Do not set it manually, it's only used by gobazel to detach itself.")
+	daemon   = flag.Bool("daemon", true, "To detach from parent process.")
+	detached = flag.Bool("detached", false, "The current process has been detached from parent process. Do not set it manually, it's only used by gobazel to detach itself.")
 
 	dirs    gopathfs.Dirs
 	version string
@@ -105,7 +106,7 @@ func main() {
 		}
 	}
 
-	if !*detached {
+	if *daemon && !*detached {
 		pid, err := detach()
 		if err != nil {
 			fmt.Println(err)
