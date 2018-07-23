@@ -1,5 +1,5 @@
 Package: gobazel
-Version: 0.1.9
+Version: 0.1.10
 Architecture: amd64
 Maintainer: linuxerwang@gmail.com
 Section: utils
